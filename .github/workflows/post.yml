@@ -1,0 +1,30 @@
+name: Threads autopost (Ctrl + ₸)
+on:
+  schedule:
+    - cron: "10 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry:
+        description: "1 = тест без публикации (проверить ключ и очередь)"
+        required: false
+        default: "1"
+permissions:
+  contents: write
+concurrency:
+  group: threads-post
+  cancel-in-progress: false
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python post.py
+        env:
+          THREADS_TOKEN: ${{ secrets.THREADS_TOKEN }}
+          ENC_KEY: ${{ secrets.ENC_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EXPECT_USERNAME: ctrl.tenge
+          DRY: ${{ github.event.inputs.dry }}
