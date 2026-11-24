@@ -1,7 +1,10 @@
 name: Threads autopost (Ctrl + ₸)
 on:
   schedule:
-    - cron: "10 * * * *"
+    - cron: "7 * * * *"
+    - cron: "23 * * * *"
+    - cron: "41 * * * *"
+    - cron: "56 * * * *"
   workflow_dispatch:
     inputs:
       dry:
