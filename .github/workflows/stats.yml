@@ -1,0 +1,15 @@
+name: Threads stats (read-only)
+on:
+  workflow_dispatch:
+jobs:
+  stats:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python stats.py
+        env:
+          THREADS_TOKEN: ${{ secrets.THREADS_TOKEN }}
+          ENC_KEY: ${{ secrets.ENC_KEY }}
