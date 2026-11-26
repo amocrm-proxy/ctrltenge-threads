@@ -103,12 +103,51 @@ at, p = fresh[0]
 text = p["text"].strip()
 if len(text) > 500:
     sys.exit(f"СТОП: пост {p['id']} длиннее 500 знаков ({len(text)}).")
-print(f"Публикую {p['id']} ({p['date']} {p['time']}):\n{text}\n")
+REPO = os.environ.get("GITHUB_REPOSITORY", "amocrm-proxy/ctrltenge-threads")
+def media_url(path):
+    return f"https://raw.githubusercontent.com/{REPO}/main/{urllib.parse.quote(path)}"
+def reachable(url):                       # Threads берёт файлы только по публичной ссылке
+    try:
+        with urllib.request.urlopen(urllib.request.Request(url, method="HEAD"), timeout=20) as r:
+            return r.status == 200
+    except Exception:
+        return False
+def kind(path):
+    return "VIDEO" if path.lower().endswith((".mp4", ".mov")) else "IMAGE"
+def wait_ready(cid, label):               # видео Threads обрабатывает не сразу
+    for _ in range(40):
+        st = threads("GET", cid, fields="status,error_message")
+        if st.get("status") == "FINISHED":
+            return
+        if st.get("status") in ("ERROR", "EXPIRED"):
+            raise RuntimeError(f"{label}: {st}")
+        time.sleep(10)
+    raise RuntimeError(f"{label}: не дождались обработки")
+
+media = [m for m in p.get("media", [])]
+urls = [media_url(m) for m in media]
+if urls and not all(reachable(u) for u in urls):
+    print("ВНИМАНИЕ: медиа недоступны по публичной ссылке (репозиторий закрыт?) — публикую только текст.")
+    media, urls = [], []
+print(f"Публикую {p['id']} ({p['date']} {p['time']}):\n{text}\nМедиа: {urls or 'нет'}\n")
 if DRY:
     print("DRY: тест, не публикую."); sys.exit(0)
 
-c = threads("POST", "me/threads", media_type="TEXT", text=text)
-time.sleep(5)
+if not media:
+    c = threads("POST", "me/threads", media_type="TEXT", text=text)
+    time.sleep(5)
+elif len(media) == 1:
+    k = kind(media[0])
+    c = threads("POST", "me/threads", media_type=k, text=text, **({"video_url": urls[0]} if k == "VIDEO" else {"image_url": urls[0]}))
+    wait_ready(c["id"], media[0])
+else:
+    kids = []
+    for m, u in zip(media[:20], urls[:20]):
+        k = kind(m)
+        ch = threads("POST", "me/threads", media_type=k, is_carousel_item="true", **({"video_url": u} if k == "VIDEO" else {"image_url": u}))
+        wait_ready(ch["id"], m); kids.append(ch["id"])
+    c = threads("POST", "me/threads", media_type="CAROUSEL", children=",".join(kids), text=text)
+    wait_ready(c["id"], "carousel")
 r = threads("POST", "me/threads_publish", creation_id=c["id"])
 state["posted"][p["id"]] = {"at": now.isoformat(timespec="minutes"), "media_id": r.get("id")}
 save_state(state, f"posted {p['id']}")
