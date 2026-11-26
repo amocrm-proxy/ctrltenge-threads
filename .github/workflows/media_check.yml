@@ -1,0 +1,15 @@
+name: Threads media check (no publish)
+on:
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python media_check.py media/salon.mp4
+        env:
+          THREADS_TOKEN: ${{ secrets.THREADS_TOKEN }}
+          ENC_KEY: ${{ secrets.ENC_KEY }}
